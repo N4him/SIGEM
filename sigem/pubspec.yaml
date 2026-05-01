@@ -1,5 +1,5 @@
 name: sigem
-description: "A new Flutter project."
+description: Sistema de Control de Asistencia de Monitorías Universitarias
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -34,6 +34,22 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+  dio: ^5.9.2
+  flutter_secure_storage: ^10.0.0
+  flutter_bloc: ^9.1.1
+  equatable: ^2.0.8
+  image_picker: ^1.2.1
+  geolocator: ^14.0.2
+  permission_handler: ^12.0.1
+  intl: ^0.20.2
+  get_it: ^9.2.1
+  html: ^0.15.6
+  web: ^1.1.1
+  js_interop: ^0.0.1
+  path_provider: ^2.1.5
+  go_router: ^17.2.1
+  persistent_bottom_nav_bar_v2: ^6.3.2
+  flutter_lazy_indexed_stack: ^0.1.0
 
 dev_dependencies:
   flutter_test:
@@ -51,6 +67,8 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+  assets:
+    - assets/images/hero_bg.png
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
