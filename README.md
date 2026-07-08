@@ -22,10 +22,6 @@ Tamaño recomendado: 300-400px de ancho para que se vean bien en una fila de 3-4
   <img src="sigem/docs/screenshots/reportes.png" alt="Historial de asistencia" width="220"/>
 </p>
 
-> 🎥 [Ver demo en video/GIF](docs/screenshots/demo.gif) — flujo completo de check-in con validación de ubicación.
-
----
-
 ## Tabla de contenido
 
 - [Características](#características)
