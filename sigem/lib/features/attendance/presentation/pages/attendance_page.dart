@@ -45,25 +45,25 @@ class _AttendancePageState extends State<AttendancePage>
   RoomModel? _selectedRoom;
   bool _loadingRooms = true;
 
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnim;
+  late AnimationController _blinkController;
+  late Animation<double> _blinkAnim;
 
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(
+    _blinkController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
-    _pulseAnim = Tween<double>(begin: 0.7, end: 1.0).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    _blinkAnim = Tween<double>(begin: 0.2, end: 1.0).animate(
+      CurvedAnimation(parent: _blinkController, curve: Curves.easeInOut),
     );
     _loadInitialData();
   }
 
   @override
   void dispose() {
-    _pulseController.dispose();
+    _blinkController.dispose();
     super.dispose();
   }
 
@@ -71,19 +71,18 @@ class _AttendancePageState extends State<AttendancePage>
     await Future.wait([_checkOpenRecord(), _loadRooms()]);
   }
 
-  Future<void> _loadRooms() async {
-    try {
-      final dataSource = RoomRemoteDataSource(sl());
-      final rooms = await dataSource.getRooms();
-      setState(() {
-        _rooms = rooms;
-        if (rooms.isNotEmpty) _selectedRoom = rooms.first;
-        _loadingRooms = false;
-      });
-    } catch (e) {
-      setState(() => _loadingRooms = false);
-    }
+Future<void> _loadRooms() async {
+  try {
+    final dataSource = RoomRemoteDataSource(sl());
+    final rooms = await dataSource.getRooms();
+    setState(() {
+      _rooms = rooms;
+      _loadingRooms = false;  // ← sin preseleccionar sala
+    });
+  } catch (e) {
+    setState(() => _loadingRooms = false);
   }
+}
 
   Future<void> _checkOpenRecord() async {
     try {
@@ -145,8 +144,10 @@ class _AttendancePageState extends State<AttendancePage>
     ));
   }
 
-  String _formatTime(DateTime dt) =>
-      '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+String _formatTime(DateTime dt) {
+  final local = dt.toLocal();
+  return '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+}
 
   @override
   Widget build(BuildContext context) {
@@ -195,14 +196,14 @@ class _AttendancePageState extends State<AttendancePage>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 _buildHeroCard(),
-                                const SizedBox(height: 32),
+                                const SizedBox(height: 28),
                                 if (!_hasOpenRecord) ...[
                                   _buildRoadmap(context),
-                                  const SizedBox(height: 32),
+                                  const SizedBox(height: 24),
                                   _buildCheckinButton(context, isLoading),
                                 ] else ...[
                                   _buildCheckoutRoadmap(context),
-                                  const SizedBox(height: 32),
+                                  const SizedBox(height: 24),
                                   _buildCheckoutButton(context, isLoading),
                                 ],
                               ],
@@ -222,50 +223,82 @@ class _AttendancePageState extends State<AttendancePage>
 
   Widget _buildHeader() {
     final isActive = _hasOpenRecord;
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-      color: _bg,
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        color: isActive ? _teal : _dark,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: (isActive ? _teal : _dark).withOpacity(0.35),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          if (isActive)
+            AnimatedBuilder(
+              animation: _blinkAnim,
+              builder: (_, __) => Opacity(
+                opacity: _blinkAnim.value,
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _green,
+                  ),
+                ),
+              ),
+            )
+          else
+            Container(
+              width: 10,
+              height: 10,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: _orange,
+              ),
+            ),
+          const SizedBox(width: 12),
           Expanded(
-            child: const Text(
-              'Asistencia',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: _ink, letterSpacing: -0.6),
+            child: Text(
+              isActive ? 'EN CURSO' : 'LIBRE',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.2,
+              ),
             ),
           ),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: isActive ? _teal : _dark,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: (isActive ? _teal : _dark).withOpacity(0.35),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              color: const Color(0x22FFFFFF),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                AnimatedBuilder(
-                  animation: _pulseAnim,
-                  builder: (_, __) => Container(
-                    width: isActive ? 8 * _pulseAnim.value + 2 : 8,
-                    height: isActive ? 8 * _pulseAnim.value + 2 : 8,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isActive ? _green : _orange,
-                    ),
-                  ),
+                Icon(
+                  isActive ? Icons.timer_rounded : Icons.schedule_rounded,
+                  color: Colors.white,
+                  size: 14,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Text(
-                  isActive ? 'EN CURSO' : 'LIBRE',
-                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.8),
+                  isActive ? 'Activo' : 'Sin jornada',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
@@ -283,7 +316,7 @@ class _AttendancePageState extends State<AttendancePage>
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(30, 40, 30, 40),
+      height: 220,
       decoration: BoxDecoration(
         color: heroColor,
         borderRadius: BorderRadius.circular(32),
@@ -295,74 +328,44 @@ class _AttendancePageState extends State<AttendancePage>
           ),
         ],
       ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -30, top: -50,
-            child: Container(
-              width: 200, height: 200,
-              decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0x0FFFFFFF)),
-            ),
-          ),
-          Positioned(
-            right: 50, top: 80,
-            child: Container(
-              width: 110, height: 110,
-              decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0x08FFFFFF)),
-            ),
-          ),
-          Positioned(
-            left: -20, bottom: -30,
-            child: Container(
-              width: 130, height: 130,
-              decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0x07FFFFFF)),
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0x22FFFFFF),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  isActive ? '● Jornada en progreso' : '○ Sin jornada activa',
-                  style: const TextStyle(
-                    color: Color(0xCCFFFFFF),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                isActive ? 'Jornada\nen curso' : 'Registra\ntu jornada',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 44,
-                  fontWeight: FontWeight.w900,
-                  height: 1.0,
-                  letterSpacing: -1.6,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(32),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Image.asset(
                 isActive
-                    ? _statusText
-                    : 'Selecciona tu sala y comparte\ntu ubicación para comenzar',
-                style: const TextStyle(
-                  color: Color(0x99FFFFFF),
-                  fontSize: 15,
-                  fontWeight: FontWeight.w400,
-                  height: 1.5,
-                ),
+                    ? 'assets/images/checkout_hero.png'
+                    : 'assets/images/checkin_hero.png',
+                fit: BoxFit.cover,
+                alignment: Alignment.centerRight,
               ),
-            ],
-          ),
-        ],
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 180,
+                    child: Text(
+                      isActive ? 'Jornada\nen curso' : 'Registra\ntu jornada',
+                      style: TextStyle(
+                        color: isActive ? Colors.black : Colors.white,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                        height: 1.0,
+                        letterSpacing: -1.2,
+                      ),
+                    ),
+                  ),
+
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -376,61 +379,71 @@ class _AttendancePageState extends State<AttendancePage>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        RichText(
-          text: const TextSpan(
-            style: TextStyle(fontSize: 20, color: _ink, fontWeight: FontWeight.w400, letterSpacing: -0.4),
-            children: [
-              TextSpan(text: 'Registrar '),
-              TextSpan(text: 'entrada', style: TextStyle(fontWeight: FontWeight.w900)),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Column(
-              children: [
-                _RoadmapDot(done: step1Done, color: _violet),
-                _RoadmapLine(done: step1Done),
-                _RoadmapDot(done: step2Done, color: _teal),
-              ],
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                children: [
-                  _RoadmapCard(
-                    title: 'Seleccionar sala',
-                    subtitle: step1Done
-                        ? _selectedRoom!.name
-                        : 'Elige el espacio donde vas a trabajar hoy',
-                    icon: Icons.meeting_room_rounded,
-                    color: _violet,
-                    done: step1Done,
-                    onTap: () => _showRoomBottomSheet(context),
-                  ),
-                  const SizedBox(height: 16),
-                  _RoadmapCard(
-                    title: 'Ubicación GPS',
-                    subtitle: step2Done
-                        ? '${_position!.latitude.toStringAsFixed(5)}, ${_position!.longitude.toStringAsFixed(5)}'
-                        : 'Confirma que estás en el lugar de trabajo',
-                    icon: Icons.my_location_rounded,
-                    color: _teal,
-                    done: step2Done,
-                    onTap: _getLocation,
-                  ),
-                ],
-              ),
-            ),
-          ],
+_StepCard(
+  number: '1',
+  title: 'Seleccionar sala',
+  subtitle: step1Done
+      ? _selectedRoom!.name
+      : 'Elige dónde vas a trabajar hoy',  // ← solo muestra nombre si ya escogió
+  icon: Icons.meeting_room_rounded,
+  color: _violet,
+  done: step1Done,
+  onTap: () => _showRoomBottomSheet(context),
+),
+        _StepConnector(done: step1Done, color: _violet),
+        _StepCard(
+          number: '2',
+          title: 'Ubicación GPS',
+          subtitle: step2Done
+              ? '${_position!.latitude.toStringAsFixed(5)}, ${_position!.longitude.toStringAsFixed(5)}'
+              : 'Confirma que estás en el lugar de trabajo',
+          icon: Icons.my_location_rounded,
+          color: _teal,
+          done: step2Done,
+          onTap: _getLocation,
         ),
       ],
     );
   }
 
-  // ─── Botón Check-in (centrado, fuera del roadmap) ─────────────────────────
+  // ─── Roadmap Check-out ────────────────────────────────────────────────────
+
+  Widget _buildCheckoutRoadmap(BuildContext context) {
+    final step1Done = _photo != null;
+    final step2Done = _position != null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _StepCard(
+          number: '1',
+          title: 'Foto de evidencia',
+          subtitle: step1Done
+              ? 'Foto capturada correctamente'
+              : 'Toma una foto del lugar antes de salir',
+          icon: Icons.camera_alt_rounded,
+          color: _orange,
+          done: step1Done,
+          onTap: _takePhoto,
+          photo: _photo,
+        ),
+        _StepConnector(done: step1Done, color: _orange),
+        _StepCard(
+          number: '2',
+          title: 'Ubicación GPS',
+          subtitle: step2Done
+              ? '${_position!.latitude.toStringAsFixed(5)}, ${_position!.longitude.toStringAsFixed(5)}'
+              : 'Confirma tu posición actual para el cierre',
+          icon: Icons.my_location_rounded,
+          color: _teal,
+          done: step2Done,
+          onTap: _getLocation,
+        ),
+      ],
+    );
+  }
+
+  // ─── Botón Check-in ───────────────────────────────────────────────────────
 
   Widget _buildCheckinButton(BuildContext context, bool isLoading) {
     final allDone = _selectedRoom != null && _position != null;
@@ -451,70 +464,7 @@ class _AttendancePageState extends State<AttendancePage>
     );
   }
 
-  // ─── Roadmap Check-out ────────────────────────────────────────────────────
-
-  Widget _buildCheckoutRoadmap(BuildContext context) {
-    final step1Done = _photo != null;
-    final step2Done = _position != null;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        RichText(
-          text: const TextSpan(
-            style: TextStyle(fontSize: 20, color: _ink, fontWeight: FontWeight.w400, letterSpacing: -0.4),
-            children: [
-              TextSpan(text: 'Registrar '),
-              TextSpan(text: 'salida', style: TextStyle(fontWeight: FontWeight.w900)),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Column(
-              children: [
-                _RoadmapDot(done: step1Done, color: _orange),
-                _RoadmapLine(done: step1Done),
-                _RoadmapDot(done: step2Done, color: _teal),
-              ],
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                children: [
-                  _RoadmapCard(
-                    title: 'Foto de evidencia',
-                    subtitle: step1Done
-                        ? 'Foto capturada correctamente'
-                        : 'Toma una foto del lugar antes de salir',
-                    icon: Icons.camera_alt_rounded,
-                    color: _orange,
-                    done: step1Done,
-                    onTap: _takePhoto,
-                  ),
-                  const SizedBox(height: 16),
-                  _RoadmapCard(
-                    title: 'Ubicación GPS',
-                    subtitle: step2Done
-                        ? '${_position!.latitude.toStringAsFixed(5)}, ${_position!.longitude.toStringAsFixed(5)}'
-                        : 'Confirma tu posición actual para el cierre',
-                    icon: Icons.my_location_rounded,
-                    color: _teal,
-                    done: step2Done,
-                    onTap: _getLocation,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  // ─── Botón Check-out (centrado, fuera del roadmap) ────────────────────────
+  // ─── Botón Check-out ──────────────────────────────────────────────────────
 
   Widget _buildCheckoutButton(BuildContext context, bool isLoading) {
     final allDone = _photo != null && _position != null;
@@ -537,181 +487,144 @@ class _AttendancePageState extends State<AttendancePage>
 
   // ─── Room Bottom Sheet ────────────────────────────────────────────────────
 
-  void _showRoomBottomSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: _bg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40, height: 4,
-                decoration: BoxDecoration(color: _border, borderRadius: BorderRadius.circular(2)),
-              ),
-            ),
-            const SizedBox(height: 20),
-            RichText(
-              text: TextSpan(
-                style: const TextStyle(fontSize: 20, color: _ink, letterSpacing: -0.4),
-                children: [
-                  const TextSpan(text: 'Seleccionar ', style: TextStyle(fontWeight: FontWeight.w400)),
-                  const TextSpan(text: 'sala', style: TextStyle(fontWeight: FontWeight.w900)),
-                  TextSpan(
-                    text: '  ${_rooms.length}',
-                    style: const TextStyle(fontSize: 14, color: _muted, fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            ..._rooms.map((room) {
-              final isSelected = _selectedRoom?.id == room.id;
-              return GestureDetector(
-                onTap: () { setState(() => _selectedRoom = room); Navigator.pop(context); },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(16),
+void _showRoomBottomSheet(BuildContext context) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: _bg,
+    isScrollControlled: true, // 👈 necesario para que el maxHeight de abajo funcione
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+    ),
+    builder: (context) {
+      return ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.75, // 👈 tope razonable, no toda la pantalla
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40, height: 4,
                   decoration: BoxDecoration(
-                    color: isSelected ? _violet : _card,
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: isSelected
-                        ? [BoxShadow(color: _violet.withOpacity(0.30), blurRadius: 14, offset: const Offset(0, 5))]
-                        : [BoxShadow(color: _ink.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 42, height: 42,
-                        decoration: BoxDecoration(
-                          color: isSelected ? const Color(0x2EFFFFFF) : const Color(0x1A7B6CF5),
-                          borderRadius: BorderRadius.circular(13),
-                        ),
-                        child: Icon(Icons.meeting_room_rounded,
-                            color: isSelected ? Colors.white : _violet, size: 20),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(room.name, style: TextStyle(
-                                fontWeight: FontWeight.w800, fontSize: 14,
-                                color: isSelected ? Colors.white : _ink)),
-                            Text(room.location, style: TextStyle(
-                                fontSize: 12,
-                                color: isSelected ? const Color(0xA6FFFFFF) : _muted)),
-                          ],
-                        ),
-                      ),
-                      if (isSelected)
-                        Container(
-                          width: 26, height: 26,
-                          decoration: const BoxDecoration(color: Color(0x33FFFFFF), shape: BoxShape.circle),
-                          child: const Icon(Icons.check_rounded, color: Colors.white, size: 14),
-                        ),
-                    ],
+                    color: _border,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-              );
-            }),
-          ],
+              ),
+              const SizedBox(height: 20),
+              RichText(
+                text: TextSpan(
+                  style: const TextStyle(fontSize: 20, color: _ink, letterSpacing: -0.4),
+                  children: [
+                    const TextSpan(text: '¿En que sala te encuentras? ', style: TextStyle(fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              ..._rooms.map((room) {
+                final isSelected = _selectedRoom?.id == room.id;
+                return GestureDetector(
+                  onTap: () { setState(() => _selectedRoom = room); Navigator.pop(context); },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isSelected ? _violet : _card,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: isSelected
+                          ? [BoxShadow(color: _violet.withOpacity(0.30), blurRadius: 14, offset: const Offset(0, 5))]
+                          : [BoxShadow(color: _ink.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 42, height: 42,
+                          decoration: BoxDecoration(
+                            color: isSelected ? const Color(0x2EFFFFFF) : const Color(0x1A7B6CF5),
+                            borderRadius: BorderRadius.circular(13),
+                          ),
+                          child: Icon(Icons.meeting_room_rounded,
+                              color: isSelected ? Colors.white : _violet, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(room.name, style: TextStyle(
+                                  fontWeight: FontWeight.w800, fontSize: 14,
+                                  color: isSelected ? Colors.white : _ink)),
+                              Text(room.location, style: TextStyle(
+                                  fontSize: 12,
+                                  color: isSelected ? const Color(0xA6FFFFFF) : _muted)),
+                            ],
+                          ),
+                        ),
+                        if (isSelected)
+                          Container(
+                            width: 26, height: 26,
+                            decoration: const BoxDecoration(
+                              color: Color(0x33FFFFFF),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.check_rounded, color: Colors.white, size: 14),
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
         ),
-      ),
-    );
-  }
+      );
+    },
+  );
+}
 }
 
-// ─── Roadmap Dot ──────────────────────────────────────────────────────────────
+// ─── Step Card ────────────────────────────────────────────────────────────────
 
-class _RoadmapDot extends StatelessWidget {
-  final bool done;
-  final Color color;
-  const _RoadmapDot({required this.done, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      width: 30,
-      height: 30,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: done ? color : const Color(0xFFFFFFFF),
-        border: Border.all(color: done ? color : const Color(0xFFCCC5BC), width: 2.5),
-        boxShadow: done
-            ? [BoxShadow(color: color.withOpacity(0.35), blurRadius: 10, offset: const Offset(0, 3))]
-            : [],
-      ),
-      child: done ? const Icon(Icons.check_rounded, color: Colors.white, size: 15) : null,
-    );
-  }
-}
-
-// ─── Roadmap Line ─────────────────────────────────────────────────────────────
-
-class _RoadmapLine extends StatelessWidget {
-  final bool done;
-  final bool faint;
-  const _RoadmapLine({required this.done, this.faint = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      width: 2.5,
-      height: 116,
-      decoration: BoxDecoration(
-        color: done
-            ? (faint ? const Color(0xFFCCC5BC) : _violet)
-            : const Color(0xFFDDD6CE),
-        borderRadius: BorderRadius.circular(2),
-      ),
-    );
-  }
-}
-
-// ─── Roadmap Card ─────────────────────────────────────────────────────────────
-
-class _RoadmapCard extends StatelessWidget {
+class _StepCard extends StatelessWidget {
+  final String number;
   final String title;
   final String subtitle;
   final IconData icon;
   final Color color;
   final bool done;
   final VoidCallback onTap;
+  final File? photo;
 
-  const _RoadmapCard({
+  const _StepCard({
+    required this.number,
     required this.title,
     required this.subtitle,
     required this.icon,
     required this.color,
     required this.done,
     required this.onTap,
+    this.photo,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
+      child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+        padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           color: done ? color : _card,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: done ? color.withOpacity(0.30) : const Color(0x0D1A1A1A),
-              blurRadius: 18,
+              color: done ? color.withOpacity(0.25) : const Color(0x0D1A1A1A),
+              blurRadius: 16,
               offset: const Offset(0, 6),
             ),
           ],
@@ -719,17 +632,24 @@ class _RoadmapCard extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 56,
-              height: 56,
+              width: 58,
+              height: 58,
               decoration: BoxDecoration(
-                color: done ? const Color(0x2EFFFFFF) : color.withOpacity(0.10),
+                color: done ? const Color(0x25FFFFFF) : color.withOpacity(0.10),
                 borderRadius: BorderRadius.circular(18),
               ),
-              child: Icon(
-                done ? Icons.check_rounded : icon,
-                color: done ? Colors.white : color,
-                size: 26,
-              ),
+              child: done
+                  ? const Icon(Icons.check_rounded, color: Colors.white, size: 26)
+                  : Center(
+                      child: Text(
+                        number,
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -745,13 +665,13 @@ class _RoadmapCard extends StatelessWidget {
                       letterSpacing: -0.2,
                     ),
                   ),
-                  const SizedBox(height: 5),
+                  const SizedBox(height: 6),
                   Text(
                     subtitle,
                     style: TextStyle(
                       fontSize: 13,
-                      color: done ? const Color(0xA6FFFFFF) : _muted,
-                      height: 1.4,
+                      color: done ? const Color(0xAAFFFFFF) : _muted,
+                      height: 1.5,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -760,21 +680,58 @@ class _RoadmapCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: done ? const Color(0x2EFFFFFF) : const Color(0x0D1A1A1A),
-                shape: BoxShape.circle,
+            if (photo != null && done)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.file(
+                  photo!,
+                  width: 58,
+                  height: 58,
+                  fit: BoxFit.cover,
+                ),
+              )
+            else
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: done ? const Color(0x25FFFFFF) : const Color(0x0D1A1A1A),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  done ? Icons.check_circle_outline_rounded : Icons.arrow_forward_rounded,
+                  color: done ? Colors.white : _muted,
+                  size: 18,
+                ),
               ),
-              child: Icon(
-                done ? Icons.check_circle_outline_rounded : Icons.arrow_forward_rounded,
-                color: done ? Colors.white : _muted,
-                size: 16,
-              ),
-            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ─── Step Connector ───────────────────────────────────────────────────────────
+
+class _StepConnector extends StatelessWidget {
+  final bool done;
+  final Color color;
+  const _StepConnector({required this.done, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 41),
+      child: Column(
+        children: List.generate(4, (i) => Container(
+          width: 2,
+          height: 6,
+          margin: const EdgeInsets.symmetric(vertical: 2),
+          decoration: BoxDecoration(
+            color: done ? color.withOpacity(0.5) : const Color(0xFFDDD6CE),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        )),
       ),
     );
   }

@@ -4,7 +4,6 @@ import 'package:sigem/core/api/api_client.dart';
 import 'package:sigem/core/api/service_locator.dart';
 import 'package:sigem/core/constants/api_constants.dart';
 import 'package:sigem/features/admin/data/datasources/presentation/pages/admin_page.dart';
-import 'package:sigem/features/attendance/presentation/pages/attendance_page.dart';
 import 'package:sigem/features/auth/domain/entities/user_entity.dart';
 import 'package:sigem/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:sigem/features/auth/presentation/bloc/auth_event.dart';
@@ -48,31 +47,46 @@ class HomeTab extends StatelessWidget {
                 children: [
                   _Header(user: user),
                   Expanded(
-                    child: SingleChildScrollView(
+                    child: Padding(
                       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _HeroCard(user: user),
-                          const SizedBox(height: 24),
-                          _buildSectionLabel('Tu Resumen', 'semanal'),
-                          const SizedBox(height: 14),
-                          const _WeeklySummaryCard(),
+                          Flexible(
+                            flex: 45,
+                            fit: FlexFit.tight,
+                            child: _HeroCard(user: user),
+                          ),
+                          // ── Resumen semanal: solo para rol user ──────────
+                          if (!user.isAdmin) ...[
+                            const SizedBox(height: 20),
+                            _buildSectionLabel('Tu Resumen', 'semanal'),
+                            const SizedBox(height: 12),
+                            Flexible(
+                              flex: 55,
+                              fit: FlexFit.tight,
+                              child: const _WeeklySummaryCard(),
+                            ),
+                          ],
                           if (user.isAdmin) ...[
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 20),
                             _buildSectionLabel('Panel', 'administrador'),
-                            const SizedBox(height: 14),
-                            _ActionCard(
-                              title: 'Panel administrador',
-                              subtitle: 'Monitores, reportes y estadísticas',
-                              icon: Icons.shield_rounded,
-                              color: _teal,
-                              badge: 'ADMIN',
-                              badgeColor: const Color(0x40FFFFFF),
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const AdminPage(),
+                            const SizedBox(height: 12),
+                            Flexible(
+                              flex: 27,
+                              fit: FlexFit.tight,
+                              child: _ActionCard(
+                                title: 'Panel administrador',
+                                subtitle: 'Monitores, reportes y estadísticas',
+                                icon: Icons.shield_rounded,
+                                color: _teal,
+                                badge: 'ADMIN',
+                                badgeColor: const Color(0x40FFFFFF),
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const AdminPage(),
+                                  ),
                                 ),
                               ),
                             ),
@@ -121,7 +135,23 @@ class _WeeklySummaryCard extends StatefulWidget {
 }
 
 class _WeeklySummaryCardState extends State<_WeeklySummaryCard> {
-  List<Map<String, dynamic>> _days = [];
+  static final List<Map<String, dynamic>> _emptyDays = [
+    {'day': 'Lu', 'hours': 0, 'is_today': false},
+    {'day': 'Ma', 'hours': 0, 'is_today': false},
+    {'day': 'Mi', 'hours': 0, 'is_today': false},
+    {'day': 'Ju', 'hours': 0, 'is_today': false},
+    {'day': 'Vi', 'hours': 0, 'is_today': false},
+    {'day': 'Sa', 'hours': 0, 'is_today': false},
+  ];
+
+  List<Map<String, dynamic>> _days = [
+    {'day': 'Lu', 'hours': 0, 'is_today': false},
+    {'day': 'Ma', 'hours': 0, 'is_today': false},
+    {'day': 'Mi', 'hours': 0, 'is_today': false},
+    {'day': 'Ju', 'hours': 0, 'is_today': false},
+    {'day': 'Vi', 'hours': 0, 'is_today': false},
+    {'day': 'Sa', 'hours': 0, 'is_today': false},
+  ];
   bool _loading = true;
 
   @override
@@ -134,13 +164,19 @@ class _WeeklySummaryCardState extends State<_WeeklySummaryCard> {
     try {
       final client = sl<ApiClient>();
       final response = await client.get(ApiConstants.weeklySummary);
-      final days = List<Map<String, dynamic>>.from(response.data['days']);
+      final raw = response.data['days'];
+      final days = raw != null
+          ? List<Map<String, dynamic>>.from(raw as List)
+          : <Map<String, dynamic>>[];
       setState(() {
-        _days = days;
+        _days = days.isEmpty ? List.from(_emptyDays) : days;
         _loading = false;
       });
-    } catch (e) {
-      setState(() => _loading = false);
+    } catch (_) {
+      setState(() {
+        _days = List.from(_emptyDays);
+        _loading = false;
+      });
     }
   }
 
@@ -148,7 +184,6 @@ class _WeeklySummaryCardState extends State<_WeeklySummaryCard> {
   Widget build(BuildContext context) {
     if (_loading) {
       return Container(
-        height: 240,
         decoration: BoxDecoration(
           color: _cardWht,
           borderRadius: BorderRadius.circular(24),
@@ -162,42 +197,41 @@ class _WeeklySummaryCardState extends State<_WeeklySummaryCard> {
       );
     }
 
-    final maxHours = _days.isEmpty
-        ? 8.0
-        : _days
-            .map((d) => (d['hours'] as num).toDouble())
-            .reduce((a, b) => a > b ? a : b);
+    final maxHours = _days
+        .map((d) => (d['hours'] as num).toDouble())
+        .fold(0.0, (double a, double b) => a > b ? a : b);
     final effectiveMax = maxHours < 1 ? 8.0 : maxHours;
-    final totalHours =
-        _days.fold(0.0, (sum, d) => sum + (d['hours'] as num).toDouble());
+    final totalHours = _days.fold(
+        0.0, (double sum, d) => sum + (d['hours'] as num).toDouble());
     final workedDays = _days.where((d) => (d['hours'] as num) > 0).length;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
-      decoration: BoxDecoration(
-        color: _cardWht,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0D1A1A1A),
-            blurRadius: 16,
-            offset: Offset(0, 6),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final trackHeight =
+            (constraints.maxHeight - 44 - 42 - 20 - 20 - 20).clamp(50.0, 160.0);
+
+        return Container(
+          width: double.infinity,
+          height: double.infinity,
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+          decoration: BoxDecoration(
+            color: _cardWht,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x0D1A1A1A),
+                blurRadius: 16,
+                offset: Offset(0, 6),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.center,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              // ── Totales ──────────────────────────────────────
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const SizedBox(height: 2),
                   RichText(
                     text: TextSpan(
                       children: [
@@ -222,46 +256,49 @@ class _WeeklySummaryCardState extends State<_WeeklySummaryCard> {
                       ],
                     ),
                   ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _violet.withOpacity(0.10),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      '$workedDays / 6 días',
+                      style: const TextStyle(
+                        color: _violet,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
                 ],
               ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _violet.withOpacity(0.10),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Text(
-                  '$workedDays / 5 días',
-                  style: const TextStyle(
-                    color: _violet,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
+              // ── Barras ───────────────────────────────────────
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: _days.map((d) {
+                    final hours = (d['hours'] as num).toDouble();
+                    final ratio = hours / effectiveMax;
+                    final isToday = d['is_today'] as bool;
+                    final absent = hours == 0;
+                    return _DayBar(
+                      day: d['day'] as String,
+                      hours: hours,
+                      ratio: ratio,
+                      absent: absent,
+                      isToday: isToday,
+                      trackHeight: trackHeight,
+                    );
+                  }).toList(),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 28),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: _days.map((d) {
-              final hours = (d['hours'] as num).toDouble();
-              final ratio = hours / effectiveMax;
-              final isToday = d['is_today'] as bool;
-              final absent = hours == 0;
-              return _DayBar(
-                day: d['day'],
-                hours: hours,
-                ratio: ratio,
-                absent: absent,
-                isToday: isToday,
-              );
-            }).toList(),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -274,6 +311,7 @@ class _DayBar extends StatelessWidget {
   final double ratio;
   final bool absent;
   final bool isToday;
+  final double trackHeight;
 
   const _DayBar({
     required this.day,
@@ -281,12 +319,11 @@ class _DayBar extends StatelessWidget {
     required this.ratio,
     required this.absent,
     required this.isToday,
+    required this.trackHeight,
   });
 
   @override
   Widget build(BuildContext context) {
-    const trackHeight = 140.0;
-
     final barColor = absent
         ? Colors.transparent
         : isToday
@@ -504,7 +541,7 @@ class _HeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      height: 300,                            // FIX 1: Stack necesita altura acotada
+      height: double.infinity,
       decoration: BoxDecoration(
         color: _violet,
         borderRadius: BorderRadius.circular(28),
@@ -524,7 +561,6 @@ class _HeroCard extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.hardEdge,
         children: [
-          // ── Círculos decorativos ─────────────────────────────
           Positioned(
             right: -24,
             top: -36,
@@ -549,17 +585,14 @@ class _HeroCard extends StatelessWidget {
               ),
             ),
           ),
-
-          // FIX 2: Positioned.fill da constraints acotados a la Column
           Positioned.fill(
             child: Padding(
-              padding: const EdgeInsets.all(30),
+              padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,   // FIX 3: no expande al infinito
-                children: [
-                  const SizedBox(height: 30),
-                  const Text(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Text(
                     'Comienza\ntu jornada',
                     style: TextStyle(
                       color: Colors.white,
@@ -569,8 +602,8 @@ class _HeroCard extends StatelessWidget {
                       letterSpacing: -1,
                     ),
                   ),
-                  const SizedBox(height: 30),
-                  const Text(
+                  SizedBox(height: 16),
+                  Text(
                     'Registra para \ncomenzar tu\nmonitoria',
                     style: TextStyle(
                       color: Color(0xA6FFFFFF),
@@ -579,8 +612,6 @@ class _HeroCard extends StatelessWidget {
                       height: 1.3,
                     ),
                   ),
-                 
-                  // FIX 4: GestureDetector con child (antes estaba vacío)
                 ],
               ),
             ),
@@ -618,6 +649,7 @@ class _ActionCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         width: double.infinity,
+        height: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
         decoration: BoxDecoration(
           color: color,
@@ -631,6 +663,7 @@ class _ActionCard extends StatelessWidget {
           ],
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
               width: 48,
@@ -645,6 +678,7 @@ class _ActionCard extends StatelessWidget {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
                     title,
@@ -668,6 +702,7 @@ class _ActionCard extends StatelessWidget {
             ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(

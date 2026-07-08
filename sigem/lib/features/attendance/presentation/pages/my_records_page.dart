@@ -3,26 +3,28 @@ import '../../data/datasources/attendance_remote_datasource.dart';
 import '../../domain/entities/attendance_entity.dart';
 import '../../../../core/api/service_locator.dart';
 
-// ─── Palette ──────────────────────────────────────────────────────────────────
-const _bg      = Color(0xFFF5EDE0);
-const _ink     = Color(0xFF1A1A1A);
-const _cardWht = Color(0xFFFFFFFF);
-const _violet  = Color(0xFF7B6CF5);
-const _orange  = Color(0xFFFF8B4C);
-const _dark    = Color(0xFF1C1C1E);
-const _teal    = Color(0xFF1D7A6B);
-const _green   = Color(0xFF3DC47E);
-const _muted   = Color(0xFF9E9488);
-const _red     = Color(0xFFE05252);
-const _border  = Color(0xFFEDE8E0);
-const _greenLight = Color(0xFFEAF3DE);
-const _blue    = Color(0xFF2D7EFF);
+const _bg           = Color(0xFFF5EDE0);
+const _ink          = Color(0xFF1A1A1A);
+const _cardWht      = Color(0xFFFFFFFF);
+const _violet       = Color(0xFF534AB7);
+const _violetText   = Color(0xFFFFFFFF);
+const _violetMuted  = Color(0xFFAFA9EC);
+const _violetSubtle = Color(0xFFCECBF6);
+const _violetDiv    = Color(0x1FFFFFFF);
+const _muted        = Color(0xFF9E9488);
+const _red          = Color(0xFFE05252);
+const _border       = Color(0xFFEDE8E0);
+const _green        = Color(0xFF3B6D11);
+const _greenBg      = Color(0xFFEAF3DE);
+const _teal         = Color(0xFF0F6E56);
+const _blue         = Color(0xFF185FA5);
 
 class MyRecordsPage extends StatefulWidget {
   const MyRecordsPage({super.key});
 
   @override
-State<MyRecordsPage> createState() => _MyRecordsPageState();}
+  State<MyRecordsPage> createState() => _MyRecordsPageState();
+}
 
 class _MyRecordsPageState extends State<MyRecordsPage> {
   late Future<List<AttendanceEntity>> _recordsFuture;
@@ -47,99 +49,110 @@ class _MyRecordsPageState extends State<MyRecordsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _bg,
-      appBar: _buildAppBar(),
-      body: FutureBuilder<List<AttendanceEntity>>(
-        future: _recordsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(_violet),
-                strokeWidth: 2.5,
+      body: SafeArea(
+        child: FutureBuilder<List<AttendanceEntity>>(
+          future: _recordsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(_violet),
+                  strokeWidth: 2.5,
+                ),
+              );
+            }
+
+            if (snapshot.hasError) {
+              return _buildError(snapshot.error.toString());
+            }
+
+            final records = snapshot.data ?? [];
+            if (records.isEmpty) return _buildEmpty();
+
+            final totalHours = records
+                .where((r) => r.hoursWorked != null)
+                .fold(0.0, (sum, r) => sum + (r.hoursWorked ?? 0));
+
+            final thisMonth = records
+                .where((r) => r.checkIn.month == DateTime.now().month)
+                .length;
+
+            return RefreshIndicator(
+              onRefresh: _refresh,
+              color: _violet,
+              backgroundColor: _cardWht,
+              displacement: 20,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // ── Título sin eyebrow de mes ─────────────────
+                          const Text(
+                            'Mis registros',
+                            style: TextStyle(
+                              color: _ink,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${records.length} jornadas en total',
+                            style: const TextStyle(
+                              color: _muted,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // ── Hero card con color violeta ────────────────
+                          _HeroStatsCard(
+                            total: records.length,
+                            hours: totalHours,
+                            thisMonth: thisMonth,
+                          ),
+                          const SizedBox(height: 24),
+
+                          // ── Etiqueta historial ────────────────────────
+                          const Text(
+                            'HISTORIAL',
+                            style: TextStyle(
+                              color: _muted,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) =>
+                            _RecordCard(record: records[index]),
+                        childCount: records.length,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             );
-          }
-
-          if (snapshot.hasError) {
-            return _buildError(snapshot.error.toString());
-          }
-
-          final records = snapshot.data ?? [];
-          if (records.isEmpty) return _buildEmpty();
-
-          final totalHours = records
-              .where((r) => r.hoursWorked != null)
-              .fold(0.0, (sum, r) => sum + (r.hoursWorked ?? 0));
-
-          final thisMonth = records
-              .where((r) => r.checkIn.month == DateTime.now().month)
-              .length;
-
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-                child: _HeroStatsCard(
-                  total: records.length,
-                  hours: totalHours,
-                  thisMonth: thisMonth,
-                ),
-              ),
-
-              // ── Solo la lista tiene pull-to-refresh ───────────────────
-              Expanded(
-                child: RefreshIndicator(
-                  onRefresh: _refresh,
-                  color: _violet,
-                  backgroundColor: _cardWht,
-                  displacement: 20,
-                  child: ListView.builder(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
-                    itemCount: records.length,
-                    itemBuilder: (context, index) =>
-                        _RecordCard(record: records[index]),
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  // ─── AppBar (sin flecha ni botón de refresh) ──────────────────────────────
-
-  AppBar _buildAppBar() {
-    return AppBar(
-      backgroundColor: _bg,
-      foregroundColor: _ink,
-      elevation: 0,
-      surfaceTintColor: Colors.transparent,
-      automaticallyImplyLeading: false,
-      titleSpacing: 20,
-      title: RichText(
-        text: const TextSpan(
-          style: TextStyle(
-            fontSize: 20,
-            color: _ink,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.5,
-          ),
-          children: [
-            TextSpan(
-              text: 'Mis ',
-              style: TextStyle(fontWeight: FontWeight.w400, color: _muted),
-            ),
-            TextSpan(text: 'registros'),
-          ],
+          },
         ),
       ),
     );
   }
-
-  // ─── Empty State ──────────────────────────────────────────────────────────
 
   Widget _buildEmpty() {
     return RefreshIndicator(
@@ -159,7 +172,7 @@ class _MyRecordsPageState extends State<MyRecordsPage> {
                   height: 72,
                   decoration: BoxDecoration(
                     color: _violet.withOpacity(0.10),
-                    borderRadius: BorderRadius.circular(22),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Icon(Icons.calendar_month_rounded,
                       size: 32, color: _violet),
@@ -170,11 +183,11 @@ class _MyRecordsPageState extends State<MyRecordsPage> {
                   style: TextStyle(
                     color: _ink,
                     fontSize: 17,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     letterSpacing: -0.3,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 5),
                 const Text(
                   'Tus jornadas aparecerán aquí',
                   style: TextStyle(color: _muted, fontSize: 13),
@@ -186,8 +199,6 @@ class _MyRecordsPageState extends State<MyRecordsPage> {
       ),
     );
   }
-
-  // ─── Error State ──────────────────────────────────────────────────────────
 
   Widget _buildError(String error) {
     return Center(
@@ -201,7 +212,7 @@ class _MyRecordsPageState extends State<MyRecordsPage> {
               height: 72,
               decoration: BoxDecoration(
                 color: _red.withOpacity(0.10),
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(20),
               ),
               child: const Icon(Icons.error_outline_rounded,
                   size: 32, color: _red),
@@ -212,11 +223,11 @@ class _MyRecordsPageState extends State<MyRecordsPage> {
               style: TextStyle(
                 color: _ink,
                 fontSize: 17,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 letterSpacing: -0.3,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 5),
             Text(
               error,
               textAlign: TextAlign.center,
@@ -227,29 +238,22 @@ class _MyRecordsPageState extends State<MyRecordsPage> {
               onTap: () => setState(() => _loadRecords()),
               child: Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    const EdgeInsets.symmetric(horizontal: 22, vertical: 13),
                 decoration: BoxDecoration(
                   color: _ink,
                   borderRadius: BorderRadius.circular(50),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _ink.withOpacity(0.20),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.refresh_rounded, color: Colors.white, size: 15),
+                    Icon(Icons.refresh_rounded, color: Colors.white, size: 16),
                     SizedBox(width: 8),
                     Text(
                       'Reintentar',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
@@ -276,184 +280,157 @@ class _HeroStatsCard extends StatelessWidget {
     required this.thisMonth,
   });
 
+  String _currentMonthYear() {
+    const months = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+    ];
+    final now = DateTime.now();
+    return '${months[now.month - 1].toUpperCase()} ${now.year}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
       decoration: BoxDecoration(
         color: _violet,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: _violet.withOpacity(0.40),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(20),
       ),
-      child: Stack(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Círculos decorativos
-          Positioned(
-            right: -20, top: -30,
-            child: Container(
-              width: 130, height: 130,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.07),
-              ),
+          // ── Eyebrow: mes actual (dentro de la card) ───────────────────
+          Text(
+            _currentMonthYear(),
+            style: const TextStyle(
+              color: _violetMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
             ),
           ),
-          Positioned(
-            right: 30, top: 40,
-            child: Container(
-              width: 70, height: 70,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.07),
-              ),
+          const SizedBox(height: 2),
+          const Text(
+            'Total jornadas',
+            style: TextStyle(
+              color: _violetSubtle,
+              fontSize: 13,
             ),
           ),
+          const SizedBox(height: 10),
 
-          // Contenido: título izquierda, stats derecha
+          // ── Número grande ─────────────────────────────────────────────
           Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
             children: [
-              // Título
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'Tu historial',
-                      style: TextStyle(
-                        color: Color(0x8DFFFFFF),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'de asistencia',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.8,
-                        height: 1.1,
-                      ),
-                    ),
-                  ],
+              Text(
+                '$total',
+                style: const TextStyle(
+                  color: _violetText,
+                  fontSize: 48,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -2,
+                  height: 1,
                 ),
               ),
-
-              // Divisor vertical
-              Container(
-                width: 1,
-                height: 78,
-                color: Colors.white.withOpacity(0.18),
-                margin: const EdgeInsets.symmetric(horizontal: 20),
-              ),
-
-              // Stats: jornadas arriba, horas + este mes abajo
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Jornadas — protagonista
-                  _BigStat(value: '$total', label: 'Jornadas'),
-                  const SizedBox(height: 8),
-                  Container(height: 1, width: 100, color: Colors.white.withOpacity(0.15)),
-                  const SizedBox(height: 8),
-                  // Horas y Este mes lado a lado
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _SmallStat(value: hours.toStringAsFixed(1), label: 'Horas'),
-                      Container(
-                        width: 1, height: 28,
-                        color: Colors.white.withOpacity(0.15),
-                        margin: const EdgeInsets.symmetric(horizontal: 12),
-                      ),
-                      _SmallStat(value: '$thisMonth', label: 'Este mes'),
-                    ],
-                  ),
-                ],
+              const SizedBox(width: 8),
+              const Text(
+                'jornadas',
+                style: TextStyle(
+                  color: _violetMuted,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w400,
+                ),
               ),
             ],
           ),
+
+          const SizedBox(height: 16),
+
+          // ── Divisor ───────────────────────────────────────────────────
+          const Divider(color: _violetDiv, height: 1, thickness: 1),
+
+          const SizedBox(height: 14),
+
+          // ── Dos métricas ──────────────────────────────────────────────
+          IntrinsicHeight(
+            child: Row(
+              children: [
+                Expanded(
+                  child: _HeroStat(
+                    label: 'Horas trabajadas',
+                    value: hours.toStringAsFixed(1),
+                    unit: 'h',
+                  ),
+                ),
+                const VerticalDivider(
+                  color: _violetDiv,
+                  width: 32,
+                  thickness: 1,
+                ),
+                Expanded(
+                  child: _HeroStat(
+                    label: 'Este mes',
+                    value: '$thisMonth',
+                    unit: 'jornadas',
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-// ─── Big Stat (jornadas — protagonista) ──────────────────────────────────────
-
-class _BigStat extends StatelessWidget {
-  final String value;
+class _HeroStat extends StatelessWidget {
   final String label;
-  const _BigStat({required this.value, required this.label});
+  final String value;
+  final String unit;
+
+  const _HeroStat({
+    required this.label,
+    required this.value,
+    required this.unit,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -0.5,
-            height: 1,
-          ),
-        ),
-        const SizedBox(height: 2),
         Text(
           label,
           style: const TextStyle(
-            color: Color(0x8DFFFFFF),
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.5,
+            color: _violetMuted,
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
           ),
         ),
-      ],
-    );
-  }
-}
-
-// ─── Small Stat (horas / este mes) ────────────────────────────────────────────
-
-class _SmallStat extends StatelessWidget {
-  final String value;
-  final String label;
-  const _SmallStat({required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -0.3,
-            height: 1,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Color(0x8DFFFFFF),
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.5,
+        const SizedBox(height: 3),
+        RichText(
+          text: TextSpan(
+            style: const TextStyle(
+              color: _violetText,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.3,
+            ),
+            children: [
+              TextSpan(text: value),
+              TextSpan(
+                text: ' $unit',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                  color: _violetMuted,
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -465,7 +442,6 @@ class _SmallStat extends StatelessWidget {
 
 class _RecordCard extends StatelessWidget {
   final AttendanceEntity record;
-
   const _RecordCard({required this.record});
 
   String _formatDate(DateTime dt) {
@@ -476,120 +452,124 @@ class _RecordCard extends StatelessWidget {
     return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
   }
 
-  String _formatTime(DateTime dt) =>
-      '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+String _formatTime(DateTime dt) {
+  final local = dt.toLocal();
+  return '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+}
 
   @override
   Widget build(BuildContext context) {
     final isOpen = record.isOpen;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(18),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: _cardWht,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: _ink.withOpacity(0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _border, width: 1),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Fecha + badge ──────────────────────────────────────────────
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                _formatDate(record.checkIn),
-                style: const TextStyle(
-                  color: _ink,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.3,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isOpen ? _green : _border,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  isOpen ? 'EN CURSO' : 'CERRADA',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.6,
-                    color: isOpen ? Colors.white : _muted,
+          // ── Encabezado ────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _formatDate(record.checkIn),
+                        style: const TextStyle(
+                          color: _ink,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        record.roomName,
+                        style: const TextStyle(
+                          color: _muted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 8),
-
-          // ── Sala ──────────────────────────────────────────────────────
-          Row(
-            children: [
-              Container(
-                width: 20,
-                height: 20,
-                decoration: BoxDecoration(
-                  color: _muted.withOpacity(0.10),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Icon(Icons.meeting_room_rounded,
-                    size: 12, color: _muted),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                record.roomName,
-                style: const TextStyle(
-                  color: _muted,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 14),
-          Container(height: 1, color: _border),
-          const SizedBox(height: 14),
-
-          // ── Chips de tiempo + horas ────────────────────────────────────
-          Row(
-            children: [
-              _TimeChip(
-                icon: Icons.login_rounded,
-                label: 'Entrada',
-                time: _formatTime(record.checkIn),
-                color: _blue,
-              ),
-              if (record.checkOut != null) ...[
-                const SizedBox(width: 8),
-                _TimeChip(
-                  icon: Icons.logout_rounded,
-                  label: 'Salida',
-                  time: _formatTime(record.checkOut!),
-                  color: _teal,
+                // Badge
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: isOpen ? _greenBg : _border,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isOpen) ...[
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: _green,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                      ],
+                      Text(
+                        isOpen ? 'En curso' : 'Cerrada',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isOpen ? _green : _muted,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
-              const Spacer(),
-              if (record.hoursWorked != null)
-                _HoursChip(
-                  value: record.hoursWorked!.toStringAsFixed(2),
-                  isOpen: false,
-                )
-              else if (isOpen)
-                _HoursChip(value: '', isOpen: true),
-            ],
+            ),
+          ),
+
+          // ── Divisor ───────────────────────────────────────────────────
+          const Divider(color: _border, height: 1, thickness: 1),
+
+          // ── Cuerpo: entrada | salida | duración ───────────────────────
+          IntrinsicHeight(
+            child: Row(
+              children: [
+                Expanded(
+                  child: _TimeBlock(
+                    label: 'Entrada',
+                    value: _formatTime(record.checkIn),
+                    valueColor: _blue,
+                  ),
+                ),
+                const VerticalDivider(color: _border, width: 1, thickness: 1),
+                Expanded(
+                  child: _TimeBlock(
+                    label: 'Salida',
+                    value: record.checkOut != null
+                        ? _formatTime(record.checkOut!)
+                        : '—',
+                    valueColor: record.checkOut != null ? _teal : _muted,
+                    dimmed: record.checkOut == null,
+                  ),
+                ),
+                const VerticalDivider(color: _border, width: 1, thickness: 1),
+                Expanded(
+                  child: _DurationBlock(
+                    hours: record.hoursWorked,
+                    isOpen: isOpen,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -597,55 +577,44 @@ class _RecordCard extends StatelessWidget {
   }
 }
 
-// ─── Time Chip ────────────────────────────────────────────────────────────────
+// ─── Time Block ───────────────────────────────────────────────────────────────
 
-class _TimeChip extends StatelessWidget {
-  final IconData icon;
+class _TimeBlock extends StatelessWidget {
   final String label;
-  final String time;
-  final Color color;
+  final String value;
+  final Color valueColor;
+  final bool dimmed;
 
-  const _TimeChip({
-    required this.icon,
+  const _TimeBlock({
     required this.label,
-    required this.time,
-    required this.color,
+    required this.value,
+    required this.valueColor,
+    this.dimmed = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.09),
-        borderRadius: BorderRadius.circular(14),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 11, color: color.withOpacity(0.7)),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 9,
-                  color: color.withOpacity(0.7),
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.3,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 3),
           Text(
-            time,
+            label.toUpperCase(),
+            style: const TextStyle(
+              color: _muted,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.4,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            value,
             style: TextStyle(
-              fontSize: 14,
-              color: color,
-              fontWeight: FontWeight.w800,
+              color: valueColor,
+              fontSize: dimmed ? 14 : 16,
+              fontWeight: dimmed ? FontWeight.w400 : FontWeight.w700,
               letterSpacing: -0.3,
             ),
           ),
@@ -655,67 +624,62 @@ class _TimeChip extends StatelessWidget {
   }
 }
 
-// ─── Hours Chip ───────────────────────────────────────────────────────────────
+// ─── Duration Block ───────────────────────────────────────────────────────────
 
-class _HoursChip extends StatelessWidget {
-  final String value;
+class _DurationBlock extends StatelessWidget {
+  final double? hours;
   final bool isOpen;
 
-  const _HoursChip({required this.value, required this.isOpen});
+  const _DurationBlock({required this.hours, required this.isOpen});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: isOpen ? _orange.withOpacity(0.12) : _greenLight,
-        borderRadius: BorderRadius.circular(14),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            isOpen ? Icons.timelapse_rounded : Icons.access_time_rounded,
-            size: 11,
-            color: isOpen ? _orange : const Color(0xFF1A9B55),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            isOpen ? 'En curso' : '$value h',
+          const Text(
+            'DURACIÓN',
             style: TextStyle(
-              fontSize: isOpen ? 11 : 14,
-              fontWeight: FontWeight.w800,
-              color: isOpen ? _orange : const Color(0xFF1A9B55),
-              letterSpacing: -0.2,
+              color: _muted,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.4,
             ),
           ),
+          const SizedBox(height: 5),
+          isOpen
+              ? const Text(
+                  'En curso',
+                  style: TextStyle(
+                    color: _muted,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w400,
+                  ),
+                )
+              : RichText(
+                  text: TextSpan(
+                    style: const TextStyle(
+                      color: _ink,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.3,
+                    ),
+                    children: [
+                      TextSpan(text: hours?.toStringAsFixed(2) ?? '—'),
+                      const TextSpan(
+                        text: ' h',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w400,
+                          color: _muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
         ],
-      ),
-    );
-  }
-}
-
-// ─── Nav Item ─────────────────────────────────────────────────────────────────
-
-class _NavItem extends StatelessWidget {
-  final IconData icon;
-  final bool active;
-
-  const _NavItem({required this.icon, this.active = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        color: active ? _orange : Colors.transparent,
-        shape: BoxShape.circle,
-      ),
-      child: Icon(
-        icon,
-        color: active ? Colors.white : Colors.white54,
-        size: 22,
       ),
     );
   }

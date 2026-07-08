@@ -14,10 +14,10 @@ import 'package:sigem/features/navigation/bloc/presentation/tabs/my_records_tab.
 
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
-const _bg   = Color(0xFFF5EDE0);
-const _ink  = Color(0xFF1A1A1A);
+const _bg     = Color(0xFFF5EDE0);
+const _ink    = Color(0xFF1A1A1A);
 const _orange = Color(0xFFFF8B4C);
-const _teal    = Color(0xFF1D7A6B);
+const _teal   = Color(0xFF1D7A6B);
 
 class MainPage extends StatelessWidget {
   final UserEntity user;
@@ -41,18 +41,17 @@ class MainPage extends StatelessWidget {
           }
         },
         child: BlocBuilder<NavigationBloc, NavigationState>(
-  buildWhen: (prev, curr) => prev.currentIndex != curr.currentIndex,
-  builder: (context, navState) {
+          buildWhen: (prev, curr) => prev.currentIndex != curr.currentIndex,
+          builder: (context, navState) {
             final tabs = _buildTabs(user);
             final navItems = _buildNavItems(user);
 
             return Scaffold(
               backgroundColor: _bg,
-              // En MainPage — reemplaza el body del Scaffold
-body: _LazyIndexedStack(
-  currentIndex: navState.currentIndex,
-  children: tabs,
-),
+              body: _LazyIndexedStack(
+                currentIndex: navState.currentIndex,
+                children: tabs,
+              ),
               bottomNavigationBar: _BottomNav(
                 currentIndex: navState.currentIndex,
                 items: navItems,
@@ -68,21 +67,30 @@ body: _LazyIndexedStack(
   }
 
   List<Widget> _buildTabs(UserEntity user) {
+    if (user.isAdmin) {
+      return [
+        HomeTab(user: user),
+        AdminTab(),
+      ];
+    }
     return [
       HomeTab(user: user),
       AttendanceTab(user: user),
       MyRecordsTab(),
-      if (user.isAdmin) AdminTab(),
     ];
   }
 
   List<_NavItemData> _buildNavItems(UserEntity user) {
+    if (user.isAdmin) {
+      return [
+        _NavItemData(icon: Icons.home_rounded),
+        _NavItemData(icon: Icons.shield_rounded),
+      ];
+    }
     return [
       _NavItemData(icon: Icons.home_rounded),
       _NavItemData(icon: Icons.fingerprint_rounded),
       _NavItemData(icon: Icons.calendar_month_rounded),
-      if (user.isAdmin)
-        _NavItemData(icon: Icons.shield_rounded),
     ];
   }
 }
@@ -136,19 +144,10 @@ class _BottomNav extends StatelessWidget {
                 color: isActive ? _teal : Colors.transparent,
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    item.icon,
-                    color: isActive ? Colors.white : Colors.white54,
-                    size: 30,
-                  ),
-                  if (isActive) ...[
-                    const SizedBox(height: 2),
-
-                  ],
-                ],
+              child: Icon(
+                item.icon,
+                color: isActive ? Colors.white : Colors.white54,
+                size: 30,
               ),
             ),
           );
@@ -158,7 +157,7 @@ class _BottomNav extends StatelessWidget {
   }
 }
 
-
+// ─── Lazy Indexed Stack ───────────────────────────────────────────────────────
 
 class _LazyIndexedStack extends StatefulWidget {
   final int currentIndex;
@@ -200,9 +199,7 @@ class _LazyIndexedStackState extends State<_LazyIndexedStack> {
     return IndexedStack(
       index: widget.currentIndex,
       children: List.generate(widget.children.length, (i) {
-        if (!_activated[i]) {
-          return const SizedBox.shrink();
-        }
+        if (!_activated[i]) return const SizedBox.shrink();
         return widget.children[i];
       }),
     );

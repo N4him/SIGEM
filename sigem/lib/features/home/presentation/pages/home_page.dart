@@ -377,7 +377,7 @@ class _HeroCard extends StatelessWidget {
               // Badge estado
               Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 6),
+                    horizontal: 8, vertical: 6),
                 decoration: BoxDecoration(
                   color: const Color(0x2EFFFFFF),
                   borderRadius: BorderRadius.circular(20),
