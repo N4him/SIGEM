@@ -9,6 +9,22 @@ Este repositorio corresponde al **frontend multiplataforma** (Android, iOS, Web,
 ![BLoC](https://img.shields.io/badge/State%20Management-flutter__bloc-1D7A6B)
 ![Platforms](https://img.shields.io/badge/platforms-android%20%7C%20ios%20%7C%20web%20%7C%20desktop-lightgrey)
 
+## Capturas de pantalla
+
+<!--
+Reemplaza cada ruta por tus propias imágenes (colócalas, por ejemplo, en una carpeta `docs/screenshots/` dentro del repo).
+Tamaño recomendado: 300-400px de ancho para que se vean bien en una fila de 3-4 columnas.
+-->
+
+<p align="center">
+  <img src="docs/screenshots/home_page.png" alt="Pantalla de login" width="220"/>
+  <img src="docs/screenshots/registro.png" alt="Check-in geolocalizado" width="220"/>
+  <img src="docs/screenshots/reportes.png" alt="Historial de asistencia" width="220"/>
+ width="220"/>
+</p>
+
+> 🎥 [Ver demo en video/GIF](docs/screenshots/demo.gif) — flujo completo de check-in con validación de ubicación.
+
 ---
 
 ## Tabla de contenido
